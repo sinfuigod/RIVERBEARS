@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карта Крючков Majestic</title>
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #1a1a1a; overflow: hidden; font-family: Arial, sans-serif; user-select: none; }
+        .hint { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.85); color: white; padding: 12px 25px; border-radius: 20px; font-size: 14px; z-index: 10; border: 1px solid #0099ff; text-align: center; box-shadow: 0 0 15px rgba(0, 153, 255, 0.4); pointer-events: none; }
+        #map-wrapper { position: absolute; top: 0; left: 0; transform-origin: 0 0; cursor: grab; }
+        #map-wrapper:active { cursor: grabbing; }
+        .map-container { display: grid; grid-template-columns: repeat(5, 256px); width: max-content; position: relative; background: #222; }
+        .map-container img { width: 256px; height: 256px; display: block; pointer-events: none; -webkit-user-drag: none; }
+        .fish-marker { position: absolute; width: 26px; height: 26px; background-image: url('./river.png'); background-size: contain; background-repeat: no-repeat; background-position: center; cursor: pointer; transform: translate(-50%, -50%); z-index: 5; filter: drop-shadow(0px 0px 5px rgba(0, 153, 255, 0.9)); transition: transform 0.1s; }
+        .fish-marker:hover { transform: translate(-50%, -50%) scale(1.2); }
+        .fish-marker.active { background-image: url('./riverGrin.png') !important; filter: drop-shadow(0px 0px 8px rgba(0, 255, 102, 1)) !important; }
+        .marker-timer { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); background: rgba(0, 255, 102, 0.9); color: black; font-weight: bold; font-size: 10px; padding: 2px 5px; border-radius: 4px; display: none; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        .fish-marker.active .marker-timer { display: block; }
+        .popup { position: absolute; background: #222; color: white; padding: 12px; border-radius: 8px; border: 1px solid #333; font-size: 14px; transform: translate(-50%, -130%); display: none; z-index: 10; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5); width: 160px; }
+        .popup button { color: white; border: none; padding: 7px 10px; border-radius: 4px; margin-top: 6px; cursor: pointer; font-weight: bold; width: 100%; font-size: 12px; }
+        .btn-success { background: #0099ff; }
+        .btn-success:hover { background: #0088ee; }
+        .btn-danger { background: #ff3333; display: none; }
+        .btn-danger:hover { background: #dd2222; }
+    </style>
+</head>
+<body>
+
+    <div class="hint">Общая онлайн-карта | Лимит: 3 активных крючка на 30 мин</div>
+    <div id="map-wrapper">
+        <div class="map-container" id="map-grid"></div>
+        <div id="map-popup" class="popup">
+            <b id="popup-title">Крючок</b>
+            <div id="popup-status" style="font-size: 11px; margin-top: 3px; color: #aaa;">Загрузка...</div>
+            <button id="popup-btn" class="btn-success">🎣 Найдено!</button>
+            <button id="popup-report-btn" class="btn-danger">❌ Ошибка / Пусто</button>
+        </div>
+    </div>
+
+<script>
+    // СЮДА ВПИШИ АДРЕС СВОЕГО БЭКЕНДА ПОСЛЕ ЕГО ЗАПУСКА
+    const SERVER_URL = 'АДРЕС_ТВОЕГО_СЕРВЕРА'; 
+
+    const wrapper = document.getElementById('map-wrapper');
+    const grid = document.getElementById('map-grid');
+    const popup = document.getElementById('map-popup');
+    const popupTitle = document.getElementById('popup-title');
+    const popupStatus = document.getElementById('popup-status');
+    const popupBtn = document.getElementById('popup-btn');
+    const popupReportBtn = document.getElementById('popup-report-btn');
+
+    // Генерация сетки
+    for (let y = 0; y < 6; y++) {
+        for (let x = 0; x < 5; x++) {
+            const img = document.createElement('img');
+            img.src = `./3/${x}/${y}.png`; 
+            img.onerror = function() {
+                if (!img.dataset.triedAlt) { img.dataset.triedAlt = "true"; img.src = `./3/${y}/${x}.png`; }
+                else { img.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><rect width='256' height='256' fill='%231f1f1f'/></svg>"; }
+            };
+            img.draggable = false;
+            grid.appendChild(img);
+        }
+    }
+
+    const hooks = [
+        { id: 1, name: "Крючок №1", x: 596, y: 200 }, { id: 2, name: "Крючок №2", x: 583, y: 179 },
+        { id: 3, name: "Крючок №3", x: 687, y: 201 }, { id: 4, name: "Крючок №4", x: 733, y: 196 },
+        { id: 5, name: "Крючок №5", x: 791, y: 203 }, { id: 6, name: "Крючок №6", x: 941, y: 326 },
+        { id: 7, name: "Крючок №7", x: 912, y: 367 }, { id: 8, name: "Крючок №8", x: 975, y: 500 },
+        { id: 9, name: "Крючок №9", x: 931, y: 681 }, { id: 10, name: "Крючок №10", x: 874, y: 764 },
+        { id: 11, name: "Крючок №11", x: 886, y: 803 }, { id: 12, name: "Крючок №12", x: 845, y: 1125 },
+        { id: 13, name: "Крючок №13", x: 688, y: 1365 }, { id: 14, name: "Крючок №14", x: 340, y: 1269 },
+        { id: 15, name: "Крючок №15", x: 356, y: 1253 }, { id: 16, name: "Крючок №16", x: 381, y: 1219 },
+        { id: 17, name: "Крючок №17", x: 291, y: 1220 }, { id: 18, name: "Крючок №18", x: 252, y: 1127 },
+        { id: 19, name: "Крючок №19", x: 226, y: 1080 }, { id: 20, name: "Крючок №20", x: 103, y: 948 },
+        { id: 21, name: "Крючок №21", x: 89, y: 872 },  { id: 22, name: "Крючок №22", x: 98, y: 855 },
+        { id: 23, name: "Крючок №23", x: 139, y: 741 }, { id: 24, name: "Крючок №24", x: 131, y: 649 },
+        { id: 25, name: "Крючок №25", x: 167, y: 526 }, { id: 26, name: "Крючок №26", x: 333, y: 358 },
+        { id: 27, name: "Крючок №27", x: 352, y: 336 }, { id: 28, name: "Крючок №28", x: 381, y: 308 },
+        { id: 29, name: "Крючок №29", x: 369, y: 247 }, { id: 30, name: "Крючок №30", x: 438, y: 472 },
+        { id: 31, name: "Крючок №31", x: 476, y: 499 }, { id: 32, name: "Крючок №32", x: 548, y: 494 },
+        { id: 33, name: "Крючок №33", x: 727, y: 463 }, { id: 34, name: "Крючок №34", x: 762, y: 550 },
+        { id: 35, name: "Крючок №35", x: 185, y: 711 }, { id: 36, name: "Крючок №36", x: 292, y: 704 },
+        { id: 37, name: "Крючок №37", x: 434, y: 664 }, { id: 38, name: "Крючок №38", x: 319, y: 777 },
+        { id: 39, name: "Крючок №39", x: 729, y: 999 }, { id: 40, name: "Крючок №40", x: 638, y: 1045 },
+        { id: 41, name: "Крючок №41", x: 631, y: 1093 }, { id: 42, name: "Крючок №42", x: 354, y: 1149 },
+        { id: 43, name: "Крючок №43", x: 387, y: 1161 }, { id: 44, name: "Крючок №44", x: 500, y: 1299 },
+        { id: 45, name: "Крючок №45", x: 573, y: 1253 }
+    ];
+
+    let globalActiveHooks = [];
+
+    // Отрисовка элементов
+    hooks.forEach(hook => {
+        const marker = document.createElement('div');
+        marker.className = 'fish-marker';
+        marker.style.left = hook.x + 'px';
+        marker.style.top = hook.y + 'px';
+        marker.id = `hook-${hook.id}`;
+
+        const timerText = document.createElement('div');
+        timerText.className = 'marker-timer';
+        timerText.id = `timer-${hook.id}`;
+        marker.appendChild(timerText);
+        
+        marker.onclick = (e) => { 
+            e.stopPropagation(); 
+            popupTitle.innerText = hook.name;
+            popup.style.left = hook.x + 'px';
+            popup.style.top = hook.y + 'px';
+            popup.style.display = 'block';
+
+            const serverActive = globalActiveHooks.find(h => h.id === hook.id);
+            if (serverActive) {
+                popupStatus.innerHTML = `<span style="color: #00ff66;">Активен онлайн. Жалоб: ${serverActive.reports}/2</span>`;
+                popupBtn.innerText = "🔄 Обновить таймер";
+                popupReportBtn.style.display = "block";
+            } else {
+                popupStatus.innerText = "Статус: Свободен";
+                popupBtn.innerText = "🎣 Найдено!";
+                popupReportBtn.style.display = "none";
+            }
+
+            popupBtn.onclick = () => sendAction('activate', hook.id);
+            popupReportBtn.onclick = () => sendAction('report', hook.id);
+        };
+        grid.appendChild(marker);
+    });
+
+    // Функция отправки действий на бэкенд
+    async function sendAction(action, id) {
+        try {
+            const res = await fetch(`${SERVER_URL}/api/hook`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action, id })
+            });
+            const data = await res.json();
+            if(!res.ok) alert(data.error || "Ошибка сервера");
+            popup.style.display = 'none';
+            updateState(data);
+        } catch (err) { console.error("Ошибка связи с сервером:", err); }
+    }
+
+    // Синхронизация состояния с сервером
+    function updateState(activeList) {
+        globalActiveHooks = activeList;
+        hooks.forEach(h => {
+            const m = document.getElementById(`hook-${h.id}`);
+            if(m) m.classList.remove('active');
+        });
+
+        const now = Date.now();
+        globalActiveHooks.forEach(hook => {
+            const m = document.getElementById(`hook-${hook.id}`);
+            if (m) {
+                m.classList.add('active');
+                const timeLeft = hook.expiresAt - now;
+                const timerDiv = document.getElementById(`timer-${hook.id}`);
+                if (timerDiv && timeLeft > 0) {
+                    const min = Math.floor(timeLeft / 60000);
+                    const sec = Math.floor((timeLeft % 60000) / 1000);
+                    timerDiv.innerText = `${min}:${sec < 10 ? '0' : ''}${sec}`;
+                }
+            }
+        });
+    }
+
+    // Ежесекундное обновление данных с сервера (Пулпинг)
+    async function loadOnlineState() {
+        try {
+            const res = await fetch(`${SERVER_URL}/api/hooks`);
+            if(res.ok) { const data = await res.json(); updateState(data); }
+        } catch (err) { console.log("Сервер недоступен..."); }
+    }
+    setInterval(loadOnlineState, 1000);
+    window.addEventListener('click', () => { popup.style.display = 'none'; });
+
+    // --- УПРАВЛЕНИЕ КАРТОЙ ---
+    let isDragging = false, clickStartX = 0, clickStartY = 0, mapX = 50, mapY = 50, scale = 0.6;             
+    function updateTransform() { wrapper.style.transform = `translate(${mapX}px, ${mapY}px) scale(${scale})`; }
+    updateTransform();
+    window.addEventListener('mousedown', (e) => { if(e.button!==0)return; isDragging=true; clickStartX=e.clientX; clickStartY=e.clientY; e.preventDefault(); });
+    window.addEventListener('mousemove', (e) => { if(!isDragging)return; mapX+=e.clientX-clickStartX; mapY+=e.clientY-clickStartY; clickStartX=e.clientX; clickStartY=e.clientY; updateTransform(); });
+    window.addEventListener('mouseup', (e) => { if(e.button===0) isDragging=false; });
+    window.addEventListener('mouseleave', () => { isDragging=false; });
+    window.addEventListener('wheel', (e) => { e.preventDefault(); const mx=e.clientX, my=e.clientY; const zx=(mx-mapX)/scale, zy=(my-mapY)/scale; if(e.deltaY<0) scale=Math.min(4, scale+0.1); else scale=Math.max(0.3, scale-0.1); mapX=mx-zx*scale; mapY=my-zy*scale; updateTransform(); }, {passive:false});
+</script>
+</body>
+</html>
