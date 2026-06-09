@@ -52,7 +52,7 @@
     // Генерация сетки
     for (let y = 0; y < 6; y++) {
         for (let x = 0; x < 5; x++) {
-            const img = document.createElement('img');
+            const SERVER_URL = 'https://sinfulgod.pythonanywhere.com';
             img.src = `./3/${x}/${y}.png`; 
             img.onerror = function() {
                 if (!img.dataset.triedAlt) { img.dataset.triedAlt = "true"; img.src = `./3/${y}/${x}.png`; }
