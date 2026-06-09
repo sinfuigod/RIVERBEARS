@@ -26,7 +26,7 @@
 </head>
 <body>
 
-    <div class="hint">Общая онлайн-карта | Лимит: 3 активных крючка на 30 мин</div>
+    <div class="hint">Общая онлайн-карта | Лимит: 3 active крючка на 30 мин</div>
     <div id="map-wrapper">
         <div class="map-container" id="map-grid"></div>
         <div id="map-popup" class="popup">
@@ -38,8 +38,8 @@
     </div>
 
 <script>
-    // СЮДА ВПИШИ АДРЕС СВОЕГО БЭКЕНДА ПОСЛЕ ЕГО ЗАПУСКА
-    const SERVER_URL = 'АДРЕС_ТВОЕГО_СЕРВЕРА'; 
+    // Твой рабочий бэкенд на PythonAnywhere
+    const SERVER_URL = 'https://sinfulgod.pythonanywhere.com'; 
 
     const wrapper = document.getElementById('map-wrapper');
     const grid = document.getElementById('map-grid');
@@ -49,14 +49,18 @@
     const popupBtn = document.getElementById('popup-btn');
     const popupReportBtn = document.getElementById('popup-report-btn');
 
-    // Генерация сетки
+    // Генерация сетки карты с исправленным созданием картинок
     for (let y = 0; y < 6; y++) {
         for (let x = 0; x < 5; x++) {
-            const SERVER_URL = 'https://sinfulgod.pythonanywhere.com';
+            const img = document.createElement('img'); 
             img.src = `./3/${x}/${y}.png`; 
             img.onerror = function() {
-                if (!img.dataset.triedAlt) { img.dataset.triedAlt = "true"; img.src = `./3/${y}/${x}.png`; }
-                else { img.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><rect width='256' height='256' fill='%231f1f1f'/></svg>"; }
+                if (!img.dataset.triedAlt) { 
+                    img.dataset.triedAlt = "true"; 
+                    img.src = `./3/${y}/${x}.png`; 
+                } else { 
+                    img.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='256' height='256'><rect width='256' height='256' fill='%231f1f1f'/></svg>"; 
+                }
             };
             img.draggable = false;
             grid.appendChild(img);
@@ -91,7 +95,7 @@
 
     let globalActiveHooks = [];
 
-    // Отрисовка элементов
+    // Отрисовка элементов рыбок
     hooks.forEach(hook => {
         const marker = document.createElement('div');
         marker.className = 'fish-marker';
@@ -167,7 +171,7 @@
         });
     }
 
-    // Ежесекундное обновление данных с сервера (Пулпинг)
+    // Ежесекундное обновление данных с сервера
     async function loadOnlineState() {
         try {
             const res = await fetch(`${SERVER_URL}/api/hooks`);
